@@ -50,6 +50,9 @@ sysinfo.txt
 # Crashlytics generated file
 crashlytics-build.properties
 
-# Keystore
-*.keystore
-Keystore Password.txt
+# Stuff I added
+.vscode/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+.editorconfig
+[Kk]eystore/
