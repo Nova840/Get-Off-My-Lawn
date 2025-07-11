@@ -2,11 +2,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+// ReSharper disable once RedundantUsingDirective, required for some parts inside an #ifdef
+using System.Linq;
 using GameJolt.API.Core;
 using GameJolt.API.Internal;
 using GameJolt.API.Objects;
 using GameJolt.External;
 using UnityEngine.Networking;
+using System.IO;
 
 namespace GameJolt.API {
 	/// <summary>
@@ -63,7 +66,7 @@ namespace GameJolt.API {
 		/// </summary>
 		protected override void Init() {
 			Configure();
-			AutoConnect();
+			StartCoroutine(AutoConnect());
 			CacheTables();
 		}
 
@@ -93,17 +96,18 @@ namespace GameJolt.API {
 			}
 
 			float timeout = Time.time + Settings.Timeout;
-			var request = UnityVersionAbstraction.GetRequest(url, format);
-			request.SendWebRequest();
-			while(!request.isDone) {
-				if(Time.time > timeout) {
-					request.Abort();
-					callback(new Response("Timeout for " + url));
-					yield break;
+			using(var request = UnityVersionAbstraction.GetRequest(url, format)) {
+				request.SendWebRequest();
+				while(!request.isDone) {
+					if(Time.time > timeout) {
+						request.Abort();
+						callback(new Response("Timeout for " + url));
+						yield break;
+					}
+					yield return new WaitForEndOfFrame();
 				}
-				yield return new WaitForEndOfFrame();
+				callback(new Response(request, format));
 			}
-			callback(new Response(request, format));
 		}
 
 		public IEnumerator PostRequest(string url, Dictionary<string, string> payload, ResponseFormat format,
@@ -115,23 +119,25 @@ namespace GameJolt.API {
 
 			float timeout = Time.time + Settings.Timeout;
 
-			var request = UnityWebRequest.Post(url, payload);
-			request.SendWebRequest();
-			while(!request.isDone) {
-				if(Time.time > timeout) {
-					request.Abort();
-					callback(new Response("Timeout for " + url));
-					yield break;
+			using(var request = UnityWebRequest.Post(url, payload)) {
+				request.SendWebRequest();
+				while(!request.isDone) {
+					if(Time.time > timeout) {
+						request.Abort();
+						callback(new Response("Timeout for " + url));
+						yield break;
+					}
+					yield return new WaitForEndOfFrame();
 				}
-				yield return new WaitForEndOfFrame();
-			}
 
-			callback(new Response(request, format));
+				callback(new Response(request, format));
+			}
 		}
 		#endregion Requests
 
 		#region Actions
-		private void AutoConnect() {
+		private IEnumerator AutoConnect() {
+			yield return null; // delay by one frame to make sure that the whole UI is already initialized
 #if UNITY_WEBGL
 			#region Autoconnect Web
 #if UNITY_EDITOR
@@ -146,31 +152,12 @@ namespace GameJolt.API {
 				}
 			}
 #else
-			var uri = new Uri(Application.absoluteURL);
-			if (uri.Host.EndsWith("gamejolt.net") || uri.Host.EndsWith("gamejolt.com"))
-			{
-				Application.ExternalEval(string.Format(@"
-var qs = location.search;
-var params = {{}};
-var tokens;
-var re = /[?&]?([^=]+)=([^&]*)/g;
-
-while (tokens = re.exec(qs)) {{
-	params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
-}}
-
-var message;
-if ('gjapi_username' in params && params.gjapi_username !== '' && 'gjapi_token' in params && params.gjapi_token !== '') {{
-	message = params.gjapi_username + ':' + params.gjapi_token;	
-}}
-else {{
-	message = '';
-}}
-
-SendMessage('{0}', 'OnAutoConnectWebPlayer', message);
-		", this.gameObject.name));
+			var user = GetUserFromUrl();
+			if(user != null) {
+				user.SignIn(success => AutoLoginEvent.Invoke(success ? AutoLoginResult.Success : AutoLoginResult.Failed));
 			} else {
-				LogHelper.Warning("Cannot AutoConnect, the game is not hosted on GameJolt.");
+				LogHelper.Info("Cannot AutoConnect.");
+				AutoLoginEvent.Invoke(AutoLoginResult.MissingCredentials);
 			}
 #endif
 
@@ -178,6 +165,20 @@ SendMessage('{0}', 'OnAutoConnectWebPlayer', message);
 #else
 
 			#region Autoconnect Non Web
+			// if started via the GameJolt app, then the credentials are placed next to our game
+			foreach(var path in new string[] { ".gj-credentials", "../.gj-credentials", "../../.gj-credentials" }) {
+				try {
+					if(File.Exists(path)) {
+						var lines = File.ReadAllLines(path);
+						// file content: version \n username \n token
+						var user = new User(lines[1], lines[2]);
+						user.SignIn(success => AutoLoginEvent.Invoke(success ? AutoLoginResult.Success : AutoLoginResult.Failed));
+						yield break;
+					}
+				} catch(Exception ex) {
+					Debug.LogException(ex);
+				}
+			}
 			string username, token;
 			if(GetStoredUserCredentials(out username, out token)) {
 				var user = new User(username, token);
@@ -190,23 +191,29 @@ SendMessage('{0}', 'OnAutoConnectWebPlayer', message);
 #endif
 		}
 
-#if UNITY_WEBGL
-		public void OnAutoConnectWebPlayer(string response) {
-			if(response != string.Empty) {
-				var credentials = response.Split(new[] {':'}, 2);
-				if(credentials.Length == 2) {
-					var user = new Objects.User(credentials[0], credentials[1]);
-					user.SignIn(success => AutoLoginEvent.Invoke(success ? AutoLoginResult.Success : AutoLoginResult.Failed));
-					// TODO: Prompt "Welcome Back <username>!"
-				} else {
-					LogHelper.Info("Cannot AutoConnect.");
-					AutoLoginEvent.Invoke(AutoLoginResult.MissingCredentials);
+#if UNITY_WEBGL && !UNITY_EDITOR
+		/// <summary>
+		/// Helper method used to parse the user credentials from the webgl url.
+		/// </summary>
+		/// <returns></returns>
+		private User GetUserFromUrl() {
+			var uri = new Uri(Application.absoluteURL);
+			if(uri.Host.EndsWith("gamejolt.net") || uri.Host.EndsWith("gamejolt.com")) {
+				var args = uri.Query.Split('?', '&') // split all arguments
+					.Where(x => x.Contains('=')) // ignore invalid arguments
+					.Select(x => x.Split('=')) // split into key and value
+					.ToLookup(x => x[0], x => x[1]); // ToLookup instead of ToDictionary, because the url may contain duplciate keys
+				if(args.Contains("gjapi_username") && args.Contains("gjapi_token")) {
+					string username = args["gjapi_username"].First();
+					string token = args["gjapi_token"].First();
+					if(username != "" && token != "") {
+						return new User(username, token);
+					}
 				}
 			} else {
-				// This is a Guest.
-				// TODO: Prompt "Hello Guest!" and encourage to signup/signin?
-				AutoLoginEvent.Invoke(AutoLoginResult.MissingCredentials);
+				LogHelper.Warning("Cannot AutoConnect, the game is not hosted on GameJolt.");
 			}
+			return null;
 		}
 #endif
 

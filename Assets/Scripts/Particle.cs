@@ -19,7 +19,7 @@ public class Particle : MonoBehaviour
     {
         Particle p = Instantiate(this, (Vector3)pos, Quaternion.identity);
         p.gameObject.SetActive(true);
-        p.body.velocity = vel;
+        p.body.linearVelocity = vel;
         p.spriteRenderer.sprite = sprite;
         p.timeRemaining = lifetime;
     }

@@ -10,10 +10,10 @@ namespace GameJolt.API
 		#region Serialized Fields
 		[Header("Game")]
 		[SerializeField, Tooltip("The game ID. It can be found on the Game Jolt website under Dashboard > YOUR-GAME > Game API > API Settings.")]
-		private int gameId = default;
+		private int gameId;
 
 		[SerializeField, Tooltip("The game Private Key. It can be found on the Game Jolt website under Dashboard > YOUR-GAME > Game API > API Settings.")]
-		private string privateKey = default;
+		private string privateKey;
 
 		[Header("Settings")]
 		[SerializeField, Tooltip("The time in seconds before an API call should timeout and return failure.")]
@@ -23,7 +23,7 @@ namespace GameJolt.API
 		private bool autoPing = true;
 
 		[SerializeField, Tooltip("Automatically show a message if a user has successfully signed in our out")]
-		private bool autoSignInOutMessage = default;
+		private bool autoSignInOutMessage;
 
 		[SerializeField, Tooltip("If AutoSignInOutMessage is set to true, this message will be shown if a user has signed in.")]
 		private string signInMessage = "Signed in as '{0}'";
@@ -41,17 +41,17 @@ namespace GameJolt.API
 		private LogHelper.LogLevel logLevel = LogHelper.LogLevel.Warning;
 
 		[SerializeField, Tooltip("List of trophies which are only shown if the user has achieved them.")]
-		private int[] secretTrophies = default;
+		private int[] secretTrophies;
 
 		[Header("Debug")]
 		[SerializeField, Tooltip("AutoConnect in the Editor as if the game was hosted on GameJolt.")]
-		private bool autoConnect = default;
+		private bool autoConnect;
 
 		[SerializeField, Tooltip("The username to use for AutoConnect.")]
-		private string user = default;
+		private string user;
 
 		[SerializeField, Tooltip("The token to use for AutoConnect.")]
-		private string token = default;
+		private string token;
 		#endregion
 
 		#region Public getter

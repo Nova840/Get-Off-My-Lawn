@@ -6,3 +6,10 @@ DefaultImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 103938
+  packageName: Game Jolt API
+  packageVersion: 2.5.8
+  assetPath: Assets/Plugins/GameJolt/Demo/Console/Console.unity
+  uploadId: 536125

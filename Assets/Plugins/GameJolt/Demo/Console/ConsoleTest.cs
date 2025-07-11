@@ -238,6 +238,15 @@ namespace GameJolt.Demo.Console {
 			});
 		}
 
+		public void TryUnlockTrophy() {
+			Debug.Log("Try Unlock Trophy. Click to see source.");
+
+			var trophyId = TrophyIdField.text != string.Empty ? int.Parse(TrophyIdField.text) : 0;
+			Trophies.TryUnlock(trophyId, success => {
+				AddConsoleLine("Unlock Trophy {0}.", success);
+			});
+		}
+
 		public void RemoveTrophy() {
 			Debug.Log("Remove Trophy. Click to see source.");
 
@@ -354,7 +363,7 @@ namespace GameJolt.Demo.Console {
 		public void UpdateDataStoreKey() {
 			DataStoreOperation mode;
 			try {
-				mode = (DataStoreOperation)System.Enum.Parse(typeof(DataStoreOperation), ModeField.captionText.text);
+				mode = (DataStoreOperation)Enum.Parse(typeof(DataStoreOperation), ModeField.captionText.text);
 			} catch {
 				Debug.LogWarning("Wrong Mode. Should be Add, Subtract, Multiply, Divide, Append or Prepend.");
 				return;

@@ -42,7 +42,7 @@ public class PlayerMove : MonoBehaviour {
             move = Application.isMobilePlatform ? GetMobileMoveVector() : GetDesktopMoveVector();
         else
             move = Vector2.zero;
-        rb.velocity = move;
+        rb.linearVelocity = move;
 
         foreach (Renderer r in runningRenderers)
             if (r.enabled != (move != Vector2.zero))
